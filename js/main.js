@@ -1,3 +1,5 @@
+// main.js
+
 // Initialize variables
 let sdk;
 let currentContent = '';
@@ -6,143 +8,128 @@ let apiKey = '';
 let conversationHistory = [];
 
 // DOM Elements
-const promptInput = document.getElementById('promptInput');
-const generateBtn = document.getElementById('generateBtn');
-const applyChangesBtn = document.getElementById('applyChangesBtn');
-const codeOutput = document.getElementById('codeOutput');
-const copyBtn = document.getElementById('copyBtn');
-const statusMessage = document.getElementById('statusMessage');
-const loaderContainer = document.getElementById('loaderContainer');
-const apiKeyModal = document.getElementById('apiKeyModal');
-const apiKeyInput = document.getElementById('apiKeyInput');
-const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+const promptInput      = document.getElementById('promptInput');
+const generateBtn      = document.getElementById('generateBtn');
+const applyChangesBtn  = document.getElementById('applyChangesBtn');
+const codeOutput       = document.getElementById('codeOutput');
+const copyBtn          = document.getElementById('copyBtn');
+const statusMessage    = document.getElementById('statusMessage');
+const loaderContainer  = document.getElementById('loaderContainer');
+const apiKeyModal      = document.getElementById('apiKeyModal');
+const apiKeyInput      = document.getElementById('apiKeyInput');
+const saveApiKeyBtn    = document.getElementById('saveApiKeyBtn');
 
-// Initialize Block SDK
-document.addEventListener('DOMContentLoaded', function() {
-    initializeBlockSDK();
+// Entry point
+document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     checkApiKey();
+
+    if (window.sfdc && window.sfdc.BlockSDK) {
+        console.log('BlockSDK found.');
+        initializeBlockSDK();
+    } else {
+        console.error('BlockSDK not found. Are you inside Content Builder?');
+        displayStatus('SFMC SDK not available. Open inside Content Builder.', 'error');
+    }
 });
 
 // Initialize Salesforce Marketing Cloud Block SDK
 function initializeBlockSDK() {
     try {
         sdk = new window.sfdc.BlockSDK();
-        sdk.getContent(content => {
-            currentContent = content;
-            codeOutput.value = content;
+        console.log('BlockSDK initialized:', sdk);
+
+        // Get existing content
+        sdk.getContent((content, err) => {
+            if (err) {
+                console.error('getContent error:', err);
+                displayStatus('Failed to load block content', 'error');
+                return;
+            }
+            currentContent = content || '';
+            codeOutput.value = currentContent;
+            console.log('Loaded content:', content);
         });
-        
-        sdk.getData(data => {
-            if (data.apiKey) {
-                apiKey = data.apiKey;
+
+        // Get persisted data (apiKey, prompt history, etc.)
+        sdk.getData((data, err) => {
+            if (err) {
+                console.error('getData error:', err);
+                return;
             }
-            
-            if (data.lastPrompt) {
-                lastPrompt = data.lastPrompt;
-                promptInput.value = lastPrompt;
-            }
-            
-            if (data.conversationHistory) {
-                conversationHistory = data.conversationHistory;
-            }
+            console.log('Loaded SDK data:', data);
+            if (data.apiKey)              apiKey = data.apiKey;
+            if (data.lastPrompt)          lastPrompt = data.lastPrompt;
+            if (data.conversationHistory) conversationHistory = data.conversationHistory;
+            if (lastPrompt)               promptInput.value = lastPrompt;
         });
+
     } catch (error) {
-        displayStatus('Error initializing Block SDK: ' + error.message, 'error');
-    }
-}
-
-// Set up event listeners
-function setupEventListeners() {
-    generateBtn.addEventListener('click', handleGenerate);
-    applyChangesBtn.addEventListener('click', applyChanges);
-    copyBtn.addEventListener('click', copyCodeToClipboard);
-    saveApiKeyBtn.addEventListener('click', saveApiKey);
-    
-    // Auto-resize textarea when content changes
-    codeOutput.addEventListener('input', () => {
-        currentContent = codeOutput.value;
-    });
-}
-
-// Check if API key is set, show modal if not
-function checkApiKey() {
-    apiKey = localStorage.getItem(CONFIG.storage.apiKey);
-    
-    if (!apiKey) {
-        apiKeyModal.style.display = 'flex';
+        console.error('Error initializing BlockSDK:', error);
+        displayStatus('Error initializing SDK: ' + error.message, 'error');
     }
 }
 
 // Save API key from modal
 function saveApiKey() {
     const newApiKey = apiKeyInput.value.trim();
-    
-    if (newApiKey) {
-        apiKey = newApiKey;
-        localStorage.setItem(CONFIG.storage.apiKey, apiKey);
-        
-        // Save to SDK data as well
-        sdk.getData(data => {
-            const updatedData = { ...data, apiKey };
-            sdk.setData(updatedData);
-        });
-        
-        apiKeyModal.style.display = 'none';
-    } else {
+    if (!newApiKey) {
         displayStatus('Please enter a valid API key', 'error');
+        return;
     }
+    apiKey = newApiKey;
+    localStorage.setItem(CONFIG.storage.apiKey, apiKey);
+
+    if (sdk) {
+        sdk.setData({ apiKey, lastPrompt, conversationHistory }, err => {
+            if (err) console.error('setData error:', err);
+            else console.log('API key saved to SDK');
+        });
+    }
+
+    apiKeyModal.style.display = 'none';
+    displayStatus('API key saved', 'success');
 }
 
 // Handle generate button click
 async function handleGenerate() {
     const prompt = promptInput.value.trim();
-    
     if (!prompt) {
         displayStatus('Please enter a prompt', 'error');
         return;
     }
-    
     if (!apiKey) {
         apiKeyModal.style.display = 'flex';
         return;
     }
-    
+
+    showLoader(true);
+
     try {
-        showLoader(true);
-        
-        // Update conversation history
+        // Build or extend conversation
         if (conversationHistory.length === 0) {
-            // Start a new conversation
             conversationHistory = [
                 { role: 'system', content: CONFIG.systemPrompt },
-                { role: 'user', content: prompt }
+                { role: 'user',   content: prompt }
             ];
         } else {
-            // Add to existing conversation
             conversationHistory.push({ role: 'user', content: prompt });
         }
-        
+
         // Call OpenAI API
         const response = await callOpenAI(conversationHistory);
-        
-        // Update the code output
         const generatedCode = response.choices[0].message.content;
+
+        // Update UI & state
         codeOutput.value = generatedCode;
         currentContent = generatedCode;
-        
-        // Add assistant's response to history
-        conversationHistory.push({ 
-            role: 'assistant', 
-            content: generatedCode 
-        });
-        
-        // Save prompt and conversation history
+        conversationHistory.push({ role: 'assistant', content: generatedCode });
         lastPrompt = prompt;
         saveDataToSDK();
-        
+
         displayStatus('Code generated successfully', 'success');
     } catch (error) {
+        console.error('OpenAI API error:', error);
         displayStatus('Error generating code: ' + error.message, 'error');
     } finally {
         showLoader(false);
@@ -155,13 +142,19 @@ function applyChanges() {
         displayStatus('No code to apply', 'error');
         return;
     }
-    
-    try {
-        sdk.setContent(currentContent);
-        displayStatus('Changes applied successfully', 'success');
-    } catch (error) {
-        displayStatus('Error applying changes: ' + error.message, 'error');
+    if (!sdk) {
+        displayStatus('SDK not initialized', 'error');
+        return;
     }
+
+    sdk.setContent(currentContent, err => {
+        if (err) {
+            console.error('setContent error:', err);
+            displayStatus('Error applying changes: ' + err.message, 'error');
+            return;
+        }
+        displayStatus('Changes applied successfully', 'success');
+    });
 }
 
 // Call OpenAI API
@@ -174,27 +167,26 @@ async function callOpenAI(messages) {
         },
         body: JSON.stringify({
             model: CONFIG.openAI.model,
-            messages: messages,
+            messages,
             temperature: CONFIG.openAI.temperature
         })
     });
-    
+
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error?.message || 'API request failed');
     }
-    
-    return await response.json();
+
+    return response.json();
 }
 
-// Save data to SDK
+// Save data to SDK and localStorage
 function saveDataToSDK() {
-    const data = {
-        lastPrompt,
-        conversationHistory
-    };
-    
-    sdk.setData(data);
+    if (!sdk) return;
+    const data = { lastPrompt, conversationHistory, apiKey };
+    sdk.setData(data, err => {
+        if (err) console.error('setData error:', err);
+    });
     localStorage.setItem(CONFIG.storage.lastPrompt, lastPrompt);
 }
 
@@ -209,8 +201,6 @@ function copyCodeToClipboard() {
 function displayStatus(message, type) {
     statusMessage.textContent = message;
     statusMessage.className = 'status ' + type;
-    
-    // Hide status after 3 seconds
     setTimeout(() => {
         statusMessage.className = 'status';
     }, 3000);
@@ -221,4 +211,20 @@ function showLoader(show) {
     loaderContainer.style.display = show ? 'flex' : 'none';
     generateBtn.disabled = show;
     applyChangesBtn.disabled = show;
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    generateBtn.addEventListener('click', handleGenerate);
+    applyChangesBtn.addEventListener('click', applyChanges);
+    copyBtn.addEventListener('click', copyCodeToClipboard);
+    saveApiKeyBtn.addEventListener('click', saveApiKey);
+}
+
+// Check if API key is set, show modal if not
+function checkApiKey() {
+    apiKey = localStorage.getItem(CONFIG.storage.apiKey) || '';
+    if (!apiKey) {
+        apiKeyModal.style.display = 'flex';
+    }
 }
