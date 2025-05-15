@@ -1,5 +1,3 @@
-<script src="https://block-sdk.s3.amazonaws.com/1.1.0/blocksdk.js"></script>
-
 // Initialize variables
 let sdk;
 let currentContent = '';
@@ -34,7 +32,21 @@ function initializeBlockSDK() {
             currentContent = content;
             codeOutput.value = content;
         });
-        // Other SDK initialization logic...
+        
+        sdk.getData(data => {
+            if (data.apiKey) {
+                apiKey = data.apiKey;
+            }
+            
+            if (data.lastPrompt) {
+                lastPrompt = data.lastPrompt;
+                promptInput.value = lastPrompt;
+            }
+            
+            if (data.conversationHistory) {
+                conversationHistory = data.conversationHistory;
+            }
+        });
     } catch (error) {
         displayStatus('Error initializing Block SDK: ' + error.message, 'error');
     }
@@ -141,11 +153,6 @@ async function handleGenerate() {
 function applyChanges() {
     if (!currentContent) {
         displayStatus('No code to apply', 'error');
-        return;
-    }
-    
-    if (!sdk) {
-        displayStatus('SDK is not initialized', 'error');
         return;
     }
     
