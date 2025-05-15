@@ -1,0 +1,24 @@
+{
+    "icon": "https://YOUR_CDN_URL/email-block-builder-icon.png",
+    "blockName": {
+      "default": "Email Block Builder",
+      "en-US": "Email Block Builder"
+    },
+    "description": {
+      "default": "Generate responsive email HTML/CSS from natural language prompts",
+      "en-US": "Generate responsive email HTML/CSS from natural language prompts"
+    },
+    "tags": [
+      "email",
+      "generator",
+      "ai",
+      "responsive",
+      "html"
+    ],
+    "entryPoints": [
+      {
+        "path": "index.html",
+        "name": "EmailBlockBuilder"
+      }
+    ]
+  }
