@@ -23,51 +23,52 @@ const saveApiKeyBtn    = document.getElementById('saveApiKeyBtn');
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     checkApiKey();
-
-    if (window.sfdc && window.sfdc.BlockSDK) {
-        console.log('BlockSDK found.');
-        initializeBlockSDK();
-    } else {
-        console.error('BlockSDK not found. Are you inside Content Builder?');
-        displayStatus('SFMC SDK not available. Open inside Content Builder.', 'error');
-    }
+    initializeBlockSDK(); // always attempt to init SDK on load
 });
+
+// Ensure sdk is created if possible
+function createSDKInstance() {
+    if (!sdk && window.sfdc && window.sfdc.BlockSDK) {
+        try {
+            sdk = new window.sfdc.BlockSDK();
+            console.log('BlockSDK instance created:', sdk);
+        } catch (e) {
+            console.error('Error creating BlockSDK instance:', e);
+        }
+    }
+}
 
 // Initialize Salesforce Marketing Cloud Block SDK
 function initializeBlockSDK() {
-    try {
-        sdk = new window.sfdc.BlockSDK();
-        console.log('BlockSDK initialized:', sdk);
+    createSDKInstance();
 
-        // Get existing content
-        sdk.getContent((content, err) => {
-            if (err) {
-                console.error('getContent error:', err);
-                displayStatus('Failed to load block content', 'error');
-                return;
-            }
-            currentContent = content || '';
-            codeOutput.value = currentContent;
-            console.log('Loaded content:', content);
-        });
-
-        // Get persisted data (apiKey, prompt history, etc.)
-        sdk.getData((data, err) => {
-            if (err) {
-                console.error('getData error:', err);
-                return;
-            }
-            console.log('Loaded SDK data:', data);
-            if (data.apiKey)              apiKey = data.apiKey;
-            if (data.lastPrompt)          lastPrompt = data.lastPrompt;
-            if (data.conversationHistory) conversationHistory = data.conversationHistory;
-            if (lastPrompt)               promptInput.value = lastPrompt;
-        });
-
-    } catch (error) {
-        console.error('Error initializing BlockSDK:', error);
-        displayStatus('Error initializing SDK: ' + error.message, 'error');
+    if (!sdk) {
+        displayStatus('SFMC SDK not available. Are you inside Content Builder?', 'error');
+        return;
     }
+
+    // Get existing content
+    sdk.getContent((content, err) => {
+        if (err) {
+            console.error('getContent error:', err);
+            displayStatus('Failed to load block content', 'error');
+            return;
+        }
+        currentContent = content || '';
+        codeOutput.value = currentContent;
+    });
+
+    // Get persisted data (apiKey, prompt history, etc.)
+    sdk.getData((data, err) => {
+        if (err) {
+            console.error('getData error:', err);
+            return;
+        }
+        if (data.apiKey)              apiKey = data.apiKey;
+        if (data.lastPrompt)          lastPrompt = data.lastPrompt;
+        if (data.conversationHistory) conversationHistory = data.conversationHistory;
+        if (lastPrompt)               promptInput.value = lastPrompt;
+    });
 }
 
 // Save API key from modal
@@ -83,7 +84,6 @@ function saveApiKey() {
     if (sdk) {
         sdk.setData({ apiKey, lastPrompt, conversationHistory }, err => {
             if (err) console.error('setData error:', err);
-            else console.log('API key saved to SDK');
         });
     }
 
@@ -106,7 +106,6 @@ async function handleGenerate() {
     showLoader(true);
 
     try {
-        // Build or extend conversation
         if (conversationHistory.length === 0) {
             conversationHistory = [
                 { role: 'system', content: CONFIG.systemPrompt },
@@ -116,11 +115,9 @@ async function handleGenerate() {
             conversationHistory.push({ role: 'user', content: prompt });
         }
 
-        // Call OpenAI API
         const response = await callOpenAI(conversationHistory);
         const generatedCode = response.choices[0].message.content;
 
-        // Update UI & state
         codeOutput.value = generatedCode;
         currentContent = generatedCode;
         conversationHistory.push({ role: 'assistant', content: generatedCode });
@@ -138,12 +135,17 @@ async function handleGenerate() {
 
 // Apply changes to the content block
 function applyChanges() {
-    if (!currentContent) {
-        displayStatus('No code to apply', 'error');
-        return;
+    // Ensure SDK is initialized before using it
+    if (!sdk) {
+        createSDKInstance();
     }
+
     if (!sdk) {
         displayStatus('SDK not initialized', 'error');
+        return;
+    }
+    if (!currentContent) {
+        displayStatus('No code to apply', 'error');
         return;
     }
 
