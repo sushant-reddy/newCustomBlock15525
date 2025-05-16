@@ -31,14 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Ensure sdk is created if possible
 function createSDKInstance() {
-    if (!sdk) {
-        try {
-            var SDK = require("blocksdk");
-            sdk = new SDK();
-            console.log('BlockSDK instance created:', sdk);
-        } catch (e) {
-            console.error('Error creating BlockSDK instance:', e);
-        }
+    if (!sdk && window.BlockSDK) {
+        sdk = new window.BlockSDK();
+        console.log('BlockSDK instance created:', sdk);
+    } else if (!window.BlockSDK) {
+        console.error('BlockSDK is not available on window object.');
     }
 }
 
