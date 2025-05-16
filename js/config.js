@@ -25,7 +25,7 @@ Guidelines:
     // API configuration
     openAI: {
         apiUrl: 'https://api.openai.com/v1/chat/completions',
-        model: 'gpt-4o',
+        model: 'gpt-4.1-nano',
         temperature: 0.2,
     },
 
