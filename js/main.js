@@ -7,6 +7,7 @@ let lastPrompt = '';
 let apiKey = '';
 let conversationHistory = [];
 
+
 // DOM Elements
 const promptInput      = document.getElementById('promptInput');
 const generateBtn      = document.getElementById('generateBtn');
@@ -26,17 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeBlockSDK(); // always attempt to init SDK on load
 });
 
+
+
 // Ensure sdk is created if possible
 function createSDKInstance() {
     if (!sdk && window.sfdc && window.sfdc.BlockSDK) {
         try {
-            sdk = new window.sfdc.BlockSDK();
+            var SDK = require("blocksdk");
+            sdk = new SDK();
             console.log('BlockSDK instance created:', sdk);
         } catch (e) {
             console.error('Error creating BlockSDK instance:', e);
         }
     }
 }
+
 
 // Initialize Salesforce Marketing Cloud Block SDK
 function initializeBlockSDK() {
