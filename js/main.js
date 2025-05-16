@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Ensure sdk is created if possible
 function createSDKInstance() {
-    if (!sdk && window.sfdc && window.sfdc.BlockSDK) {
+    if (!sdk) {
         try {
             var SDK = require("blocksdk");
             sdk = new SDK();
