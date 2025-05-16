@@ -1,6 +1,6 @@
 // main.js
-<script src="./blocksdk.js"></script>
 // Initialize variables
+
 let sdk;
 let currentContent = '';
 let lastPrompt = '';
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Ensure sdk is created if possible
 function createSDKInstance() {
     if (!sdk) {
-        const sdk = new window.sfdc.BlockSDK();
+        var sdk = new window.sfdc.BlockSDK();
         console.log('BlockSDK instance created:', sdk);
     } else if (!window.BlockSDK) {
         console.error('BlockSDK is not available on window object.');
