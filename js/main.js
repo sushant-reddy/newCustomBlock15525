@@ -32,19 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // Ensure sdk is created if possible
 function createSDKInstance() {
     if (!sdk) {
-        try {
-            if (window.BlockSDK) {
-                sdk = new window.BlockSDK();
-                console.log('BlockSDK instance created:', sdk);
-            } else {
-                console.error('BlockSDK is not available on window object.');
-            }
-        } catch (e) {
-            console.error('Error creating BlockSDK instance:', e);
-        }
+        sdk = new window.BlockSDK();
+        console.log('BlockSDK instance created:', sdk);
+    } else if (!window.BlockSDK) {
+        console.error('BlockSDK is not available on window object.');
     }
 }
-
 
 
 // Initialize Salesforce Marketing Cloud Block SDK
